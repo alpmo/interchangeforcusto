@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alp Analyzer - Interchange Overpayment Estimator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background: #f4f4f4;
+      max-width: 800px;
+      margin: auto;
+    }
+    h2 {
+      color: #333;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e6f7e6;
+      border-left: 4px solid #28a745;
+    }
+  </style>
+</head>
+<body>
+  <h2>Alp Analyzer - Interchange Overpayment Estimator</h2>
+  <p>Upload your CSV statement (with columns: Transaction Volume, Interchange Paid, Total Fee Paid):</p>
+  <input type="file" id="fileInput" accept=".csv" />
+
+  <div id="output" class="result"></div>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const lines = event.target.result.split('\n').slice(1);
+        let totalVolume = 0, totalFees = 0, totalInterchange = 0;
+        lines.forEach(line => {
+          const cols = line.split(',');
+          if (cols.length < 7) return;
+          const volume = parseFloat(cols[2]);
+          const interchange = parseFloat(cols[4]);
+          const fees = parseFloat(cols[6]);
+          if (!isNaN(volume) && !isNaN(interchange) && !isNaN(fees)) {
+            totalVolume += volume;
+            totalInterchange += interchange;
+            totalFees += fees;
+          }
+        });
+        const effectiveRate = totalFees / totalVolume;
+        const interchangeRate = totalInterchange / totalVolume;
+        const overInterchangeBps = (effectiveRate - interchangeRate) * 10000;
+        const overInterchangeDollars = totalFees - totalInterchange;
+
+        const summary = `
+          <h3>Summary:</h3>
+          <ul>
+            <li><strong>Total Volume:</strong> $${totalVolume.toFixed(2)}</li>
+            <li><strong>Total Fees:</strong> $${totalFees.toFixed(2)}</li>
+            <li><strong>Effective Rate:</strong> ${(effectiveRate * 100).toFixed(2)}%</li>
+            <li><strong>Estimated Interchange:</strong> ${(interchangeRate * 100).toFixed(2)}%</li>
+            <li><strong>Over Interchange:</strong> ${overInterchangeBps.toFixed(0)} bps ($${overInterchangeDollars.toFixed(2)})</li>
+          </ul>
+          <h4>GPT Summary:</h4>
+          <p>This merchant is paying <strong>${overInterchangeBps.toFixed(0)}bps</strong> over base interchange, totaling <strong>$${overInterchangeDollars.toFixed(2)}</strong> in overpayment. Likely on flat-rate or tiered pricing. Recommend reviewing downgrade categories and assessing pass-through options.</p>
+        `;
+
+        document.getElementById('output').innerHTML = summary;
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>
